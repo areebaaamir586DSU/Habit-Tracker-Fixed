@@ -39,9 +39,6 @@ $fullBase = $scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . BASE_URL;
 body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg-primary);color:var(--text-primary);line-height:1.6;overflow-x:hidden}
 body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%;background:radial-gradient(circle at 30% 50%,rgba(99,102,241,0.06) 0%,transparent 50%),radial-gradient(circle at 70% 80%,rgba(139,92,246,0.05) 0%,transparent 50%);z-index:-1;animation:bgFloat 20s ease-in-out infinite}
 @keyframes bgFloat{0%,100%{transform:translate(0,0)}50%{transform:translate(-2%,-2%)}}
-body::before{animation:none!important}
-.shape{animation:none!important}
-.navbar{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
 a{color:var(--accent);text-decoration:none;font-weight:600}
 a:hover{text-decoration:underline}
 img{max-width:100%}

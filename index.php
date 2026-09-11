@@ -1,5 +1,12 @@
 <?php
 require_once __DIR__ . '/config.php';
+
+// "/" resolves to this file under both php -S and Apache. Show the landing
+// page when logged out, the app when logged in.
+if (!isset($_SESSION['user_id'])) {
+    require __DIR__ . '/landing.php';
+    exit;
+}
 requireAuth();
 
 $username = htmlspecialchars($_SESSION['username'] ?? 'User');
@@ -24,15 +31,6 @@ $respCSS = '
 .auth-bar-right{display:flex;align-items:center;flex-shrink:0}
 .auth-bar a{color:var(--accent);text-decoration:none;font-weight:700;white-space:nowrap}
 body{padding-top:40px!important;overflow-x:hidden}
-
-/* PERFORMANCE: kill GPU/compositor killers that freeze weak machines
-   (fullpage infinite gradient anim + backdrop blur on every card) */
-body::before,body::after{display:none!important;animation:none!important}
-*{backdrop-filter:none!important}
-.btn-glow{animation:none!important}
-.quote-card::before,.xp-progress-fill::after{animation:none!important}
-.streak-fire{animation:none!important}
-:root{--blur:blur(0px)}
 
 /* PREVENT FIXED-WIDTH OVERFLOW BELOW 1440 (tabs/stats force .app-container min-content to 1440) */
 .app-container{min-width:0}
