@@ -25,6 +25,20 @@ $respCSS = '
 .auth-bar a{color:var(--accent);text-decoration:none;font-weight:700;white-space:nowrap}
 body{padding-top:40px!important;overflow-x:hidden}
 
+/* PERFORMANCE: kill GPU/compositor killers that freeze weak machines
+   (fullpage infinite gradient anim + backdrop blur on every card + all transitions) */
+body::before,body::after{display:none!important;animation:none!important}
+*{backdrop-filter:none!important}
+*{transition:none!important}
+.btn-glow{animation:none!important}
+.quote-card::before,.xp-progress-fill::after{animation:none!important}
+.streak-fire{animation:none!important}
+.tab-content{animation:none!important}
+:root{--blur:blur(0px);--transition:opacity .12s linear}
+
+/* PREVENT FIXED-WIDTH OVERFLOW BELOW 1440 (tabs/stats force .app-container min-content to 1440) */
+.app-container{min-width:0}
+
 /* TABLET */
 @media(max-width:900px){
 .sidebar-toggle{top:46px!important;left:12px!important;z-index:91!important}
@@ -147,13 +161,25 @@ $authBarHTML = '<div class="auth-bar">
     <div class="auth-bar-right"><a href="settings.php" style="margin-right:8px">Settings</a><a href="logout.php" class="logout-btn">Logout</a></div>
 </div>';
 
-$html = str_replace('</head>', $respCSS . "\n</head>", $html);
-$html = str_replace('<body>', '<body>' . "\n" . $authBarHTML, $html);
+function replaceFirst($subject, $search, $replace) {
+    $pos = strpos($subject, $search);
+    if ($pos === false) return $subject;
+    return substr_replace($subject, $replace, $pos, strlen($search));
+}
+
+function replaceLast($subject, $search, $replace) {
+    $pos = strrpos($subject, $search);
+    if ($pos === false) return $subject;
+    return substr_replace($subject, $replace, $pos, strlen($search));
+}
+
+$html = replaceFirst($html, '</head>', $respCSS . "\n</head>");
+$html = replaceFirst($html, '<body>', '<body>' . "\n" . $authBarHTML);
 
 // === SERVER STORAGE BRIDGE ===
 $bridgeScript = '<script id="server-bridge">
 var __SRV=(function(){
-var API="api.php",cache={},pending={},saveTimer=null;
+var API="api.php",cache={},pending={},pendingRemoves=null,saveTimer=null;
 var CSRF="' . generateCsrfToken() . '";
 
 function loadAll(){
@@ -189,18 +215,37 @@ x.send(body);
 }catch(e){console.error("[Bridge] save error:",e);}
 }
 
+function flushRemoves(){
+if(!pendingRemoves)return;
+var ks=Object.keys(pendingRemoves);pendingRemoves=null;
+if(!ks.length)return;
+var body=JSON.stringify({keys:ks});
+try{
+var u=API+"?action=delete&_csrf="+CSRF;
+if(navigator.sendBeacon){
+navigator.sendBeacon(u,new Blob([body],{type:"application/json;charset=UTF-8"}));
+}else{
+var x=new XMLHttpRequest();
+x.open("POST",u,true);
+x.setRequestHeader("Content-Type","application/json;charset=UTF-8");
+x.send(body);
+}
+}catch(e){console.error("[Bridge] delete error:",e);}
+}
+
 function queueSave(k,v){pending[k]=v;if(saveTimer)clearTimeout(saveTimer);saveTimer=setTimeout(flushPending,80);}
 
 loadAll();
-window.addEventListener("beforeunload",function(){flushPending();});
-window.addEventListener("pagehide",function(){flushPending();});
-setInterval(function(){flushPending();},3000);
+window.__CSRF=CSRF;
+window.addEventListener("beforeunload",function(){flushPending();flushRemoves();});
+window.addEventListener("pagehide",function(){flushPending();flushRemoves();});
+setInterval(function(){flushPending();flushRemoves();},3000);
 
 return{
 get:function(k){return cache.hasOwnProperty(k)?cache[k]:null;},
 set:function(k,v){var s=String(v);cache[k]=s;queueSave(k,s);},
-remove:function(k){delete cache[k];queueSave(k,"null");},
-clear:function(){cache={};}
+remove:function(k){delete cache[k];if(!pendingRemoves)pendingRemoves={};pendingRemoves[k]=1;},
+clear:function(){var ks=Object.keys(cache);if(ks.length){if(!pendingRemoves)pendingRemoves={};for(var i=0;i<ks.length;i++)pendingRemoves[ks[i]]=1;}cache={};}
 };
 })();
 </script>';
@@ -302,8 +347,8 @@ if(!__SRV.get("onboarding_done"))setTimeout(showOnboarding,800);
 var notifCount=0;
 function toggleNotifs(){var p=document.getElementById("notifPanel");p.style.display=p.style.display==="block"?"none":"block";if(p.style.display==="block")loadNotifs();}
 function loadNotifs(){fetch("api.php?action=notifications").then(function(r){return r.json()}).then(function(n){var c=document.getElementById("notifList");if(!n.length){c.innerHTML="<div style=padding:24px;text-align:center;color:var(--text-muted);font-size:13px>No notifications yet</div>";return;}c.innerHTML=n.slice(0,20).map(function(x){return "<div style=padding:10px 12px;border-radius:8px;margin:4px 8px;font-size:13px;background:"+(x.read?"transparent":"rgba(99,102,241,0.06)")+";cursor:pointer;border:1px solid var(--border)"+"><div style=font-weight:"+(x.read?"400":"700")+">"+(x.icon||"📌")+" "+x.title+"</div>"+(x.desc?"<div style=font-size:11px;color:var(--text-muted);margin-top:2px>"+x.desc+"</div>":"")+"</div>";}).join("");}).catch(function(){});}
-function markAllRead(){fetch("api.php?action=notifications",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({mark_read:true})}).then(function(){loadNotifs();});}
-function addNotification(icon,title,desc){fetch("api.php?action=notifications").then(function(r){return r.json()}).then(function(n){n.unshift({icon:icon,title:title,desc:desc,read:false,time:Date.now()});n=n.slice(0,50);fetch("api.php?action=notifications",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(n)});});}
+function markAllRead(){fetch("api.php?action=notifications&_csrf="+encodeURIComponent(window.__CSRF||""),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({mark_read:true})}).then(function(){loadNotifs();});}
+function addNotification(icon,title,desc){fetch("api.php?action=notifications").then(function(r){return r.json()}).then(function(n){n.unshift({icon:icon,title:title,desc:desc,read:false,time:Date.now()});n=n.slice(0,50);fetch("api.php?action=notifications&_csrf="+encodeURIComponent(window.__CSRF||""),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(n)});});}
 
 // === THEME CUSTOMIZER ===
 var accentColors=["#6366f1","#8b5cf6","#ec4899","#ef4444","#f59e0b","#10b981","#06b6d4","#3b82f6"];
@@ -320,7 +365,7 @@ function toggleAnimations(){var on=document.getElementById("animationsToggle").c
 document.addEventListener("keydown",function(e){if(e.target.tagName==="INPUT"||e.target.tagName==="TEXTAREA"||e.target.tagName==="SELECT")return;switch(e.key){case "n":case "N":e.preventDefault();var fab=document.querySelector(".fab");if(fab)fab.click();break;case "/":e.preventDefault();var search=document.querySelector(".search-input,.filter-input,input[type=search]");if(search)search.focus();break;case "?":e.preventDefault();var el=document.getElementById("kbdHint");el.style.display=el.style.display==="flex"?"none":"flex";break;case "Escape":closeThemePanel();document.getElementById("notifPanel").style.display="none";document.getElementById("kbdHint").style.display="none";break;}});
 
 // === SERVICE WORKER ===
-if("serviceWorker" in navigator){navigator.serviceWorker.register("/service-worker.js").catch(function(){});}
+if("serviceWorker" in navigator){navigator.serviceWorker.register("service-worker.js",{scope:"."}).catch(function(){});}
 
 // === ADD NAV BUTTONS ===
 function addProButtons(){var bar=document.querySelector(".auth-bar-right");if(!bar)return;
@@ -332,7 +377,7 @@ if(document.readyState==="loading"){document.addEventListener("DOMContentLoaded"
 </script>
 PROFEATURES;
 
-$html = str_replace('</body>', $proFeatures . "\n</body>", $html);
+$html = replaceLast($html, '</body>', $proFeatures . "\n</body>");
 
 // No-cache headers
 header('Content-Type: text/html; charset=utf-8');

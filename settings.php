@@ -5,11 +5,12 @@ $csrfToken = generateCsrfToken();
 $username = htmlspecialchars($_SESSION['username'] ?? 'User');
 
 $db = getDb();
-$stmt = $db->prepare('SELECT email FROM users WHERE id = :id');
+$stmt = $db->prepare('SELECT email, created_at FROM users WHERE id = :id');
 $stmt->bindValue(':id', $_SESSION['user_id'], SQLITE3_INTEGER);
 $result = $stmt->execute();
 $user = $result->fetchArray(SQLITE3_ASSOC);
 $email = htmlspecialchars($user['email'] ?? '');
+$memberSince = date('M Y', strtotime($user['created_at'] ?? 'now'));
 $db->close();
 ?>
 <!DOCTYPE html>
@@ -92,7 +93,7 @@ h1{font-size:28px;font-weight:800;margin-bottom:4px}
         </div>
         <div class="info-row">
             <span class="info-label">Member since</span>
-            <span class="info-value"><?php echo date('M Y'); ?></span>
+            <span class="info-value"><?php echo htmlspecialchars($memberSince); ?></span>
         </div>
     </div>
 
@@ -183,6 +184,7 @@ h1{font-size:28px;font-weight:800;margin-bottom:4px}
     </div>
 </div>
 <script>
+var CSRF_TOKEN = <?php echo json_encode($csrfToken); ?>;
 function toggleTheme(){var t=document.documentElement.getAttribute('data-theme'),n=t==='dark'?'light':'dark';document.documentElement.setAttribute('data-theme',n);localStorage.setItem('authTheme',n);document.querySelector('.theme-btn').textContent=n==='dark'?'☀️':'🌙';}
 (function(){var s=localStorage.getItem('authTheme');if(s){document.documentElement.setAttribute('data-theme',s);document.querySelector('.theme-btn').textContent=s==='dark'?'☀️':'🌙';}else if(matchMedia('(prefers-color-scheme:dark)').matches){document.documentElement.setAttribute('data-theme','dark');document.querySelector('.theme-btn').textContent='☀️';}})();
 function showMsg(id,type,msg){var el=document.getElementById(id);el.textContent=msg;el.className='msg visible '+type;}
@@ -211,7 +213,7 @@ function deleteAccount(e){
     return false;
 }
 function resetData(){
-    fetch('api.php?action=reset',{method:'POST',headers:{'Content-Type':'application/json'}}).then(function(r){return r.json()}).then(function(d){
+    fetch('api.php?action=reset&_csrf='+encodeURIComponent(CSRF_TOKEN),{method:'POST',headers:{'Content-Type':'application/json'}}).then(function(r){return r.json()}).then(function(d){
         if(d.success){showMsg('dataMsg','success','Data reset. Reloading...');setTimeout(function(){window.location.reload();},1000);}
         else{showMsg('dataMsg','error',d.error||'Failed');}
     }).catch(function(){showMsg('dataMsg','error','Network error');});

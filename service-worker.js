@@ -1,12 +1,8 @@
-const CACHE_NAME = 'habit-tracker-v1';
+const CACHE_NAME = 'habit-tracker-v2';
 const STATIC_ASSETS = [
-  '/',
-  '/landing.php',
-  '/login.php',
-  '/signup.php',
-  '/settings.php',
-  '/favicon.svg',
-  '/manifest.json'
+  './',
+  './favicon.svg',
+  './manifest.json'
 ];
 
 self.addEventListener('install', event => {
@@ -26,16 +22,19 @@ self.addEventListener('activate', event => {
 });
 
 self.addEventListener('fetch', event => {
-  // Only cache GET requests, skip API calls
+  // Only cache successful GETs of static assets; never cache PHP or API calls.
   if (event.request.method !== 'GET') return;
-  if (event.request.url.includes('api.php')) return;
-  if (event.request.url.includes('auth.php')) return;
+  const url = new URL(event.request.url);
+  if (url.pathname.endsWith('.php')) return;
+  if (url.pathname.endsWith('manifest.json')) return;
 
   event.respondWith(
     fetch(event.request)
       .then(response => {
-        const clone = response.clone();
-        caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+        if (response.ok) {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+        }
         return response;
       })
       .catch(() => caches.match(event.request))

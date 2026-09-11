@@ -118,11 +118,11 @@ if ($action === 'signup') {
         $defaultChallenges = json_encode(['active' => [], 'completed' => []]);
 
         $initData = [
-            'habits' => '[]',
-            'xp' => '0',
-            'freezes' => '0',
-            'bundles' => '[]',
-            'settings' => $defaultSettings,
+            'habits_default' => '[]',
+            'xp_default' => '0',
+            'freezes_default' => '0',
+            'bundles_default' => '[]',
+            'settings_default' => $defaultSettings,
             'profiles' => $defaultProfile,
             'currentProfile' => 'default',
             'quests' => $defaultQuests,
@@ -153,11 +153,10 @@ if ($action === 'signup') {
         jsonResponse(['success' => true, 'redirect' => BASE_URL . '/index.php']);
     } catch (\Throwable $e) {
         error_log('[Signup Error] ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
-        jsonError('Signup failed: ' . $e->getMessage());
+        jsonError('Signup failed. Please try again.');
     }
 
 } elseif ($action === 'login') {
-    checkRateLimit('login');
     verifyCsrf();
 
     $username = trim($_POST['username'] ?? '');
@@ -175,6 +174,7 @@ if ($action === 'signup') {
     $user = $result->fetchArray(SQLITE3_ASSOC);
 
     if (!$user || !password_verify($password, $user['password_hash'])) {
+        checkRateLimit('login');
         $db->close();
         jsonError('Invalid username or password');
     }
@@ -211,7 +211,7 @@ if ($action === 'signup') {
     }
 
 } elseif ($action === 'request_reset') {
-    checkRateLimit('reset');
+    verifyCsrf();
     $email = trim($_POST['email'] ?? '');
     if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
         jsonError('Valid email required');
@@ -231,13 +231,15 @@ if ($action === 'signup') {
         $stmt->bindValue(':e', $expires, SQLITE3_TEXT);
         $stmt->bindValue(':id', $user['id'], SQLITE3_INTEGER);
         $stmt->execute();
-        error_log("[Password Reset] Email: {$email}, Token: {$resetToken}");
+        error_log("[Password Reset] Reset requested for email: {$email}");
+        checkRateLimit('reset');
     }
     $db->close();
-    jsonResponse(['success' => true, 'message' => 'If an account exists with that email, a reset link has been generated. Check the server logs for the reset link.']);
+    jsonResponse(['success' => true, 'message' => 'If an account exists with that email, a reset link has been generated.']);
 
 } elseif ($action === 'reset_password') {
     checkRateLimit('reset_confirm');
+    verifyCsrf();
     $token = $_POST['token'] ?? '';
     $newPassword = $_POST['new_password'] ?? '';
     $confirm = $_POST['confirm_password'] ?? '';

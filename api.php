@@ -9,8 +9,19 @@ $action = $_GET['action'] ?? $_POST['action'] ?? '';
 $db = getDb();
 
 // Verify CSRF for all write actions
-if ($method === 'POST' && in_array($action, ['save', 'delete', 'reset', 'import'])) {
+if ($method === 'POST' && in_array($action, ['save', 'delete', 'reset', 'import', 'invite', 'join', 'disconnect_partner', 'notifications'])) {
     verifyCsrf();
+}
+
+// Habit/XP/etc. data is stored under the active profile scope (e.g. habits_default)
+function scopedDataKey(SQLite3 $db, int $userId, string $baseKey): string {
+    $stmt = $db->prepare('SELECT data_value FROM user_data WHERE user_id = :uid AND data_key = :k');
+    $stmt->bindValue(':uid', $userId, SQLITE3_INTEGER);
+    $stmt->bindValue(':k', 'currentProfile', SQLITE3_TEXT);
+    $result = $stmt->execute();
+    $row = $result->fetchArray(SQLITE3_ASSOC);
+    $profile = $row['data_value'] ?? 'default';
+    return $baseKey . '_' . $profile;
 }
 
 if ($action === 'load') {
@@ -161,9 +172,10 @@ if ($action === 'load') {
     header('Content-Disposition: attachment; filename="habits-' . date('Y-m-d') . '.csv"');
 
     $db2 = getDb();
+    $habitsKey = scopedDataKey($db2, $userId, 'habits');
     $stmt = $db2->prepare('SELECT data_value FROM user_data WHERE user_id = :uid AND data_key = :k');
     $stmt->bindValue(':uid', $userId, SQLITE3_INTEGER);
-    $stmt->bindValue(':k', 'habits', SQLITE3_TEXT);
+    $stmt->bindValue(':k', $habitsKey, SQLITE3_TEXT);
     $result = $stmt->execute();
     $row = $result->fetchArray(SQLITE3_ASSOC);
     $habits = json_decode($row['data_value'] ?? '[]', true) ?: [];
@@ -270,10 +282,12 @@ if ($action === 'load') {
 
     $partnerId = (int)$partnerData['partner_id'];
 
-    // Fetch partner's habits
+    // Fetch partner's habits (profile-scoped)
+    $habitsKey = scopedDataKey($db, $partnerId, 'habits');
+    $xpKey = scopedDataKey($db, $partnerId, 'xp');
     $stmt = $db->prepare('SELECT data_value FROM user_data WHERE user_id = :pid AND data_key = :k');
     $stmt->bindValue(':pid', $partnerId, SQLITE3_INTEGER);
-    $stmt->bindValue(':k', 'habits', SQLITE3_TEXT);
+    $stmt->bindValue(':k', $habitsKey, SQLITE3_TEXT);
     $result = $stmt->execute();
     $prow = $result->fetchArray(SQLITE3_ASSOC);
     $partnerHabits = json_decode($prow['data_value'] ?? '[]', true) ?: [];
@@ -281,7 +295,7 @@ if ($action === 'load') {
     // Fetch partner's XP
     $stmt = $db->prepare('SELECT data_value FROM user_data WHERE user_id = :pid AND data_key = :k');
     $stmt->bindValue(':pid', $partnerId, SQLITE3_INTEGER);
-    $stmt->bindValue(':k', 'xp', SQLITE3_TEXT);
+    $stmt->bindValue(':k', $xpKey, SQLITE3_TEXT);
     $result = $stmt->execute();
     $prow = $result->fetchArray(SQLITE3_ASSOC);
     $partnerXp = (int)($prow['data_value'] ?? 0);

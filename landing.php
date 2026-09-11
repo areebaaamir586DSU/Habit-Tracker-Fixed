@@ -5,6 +5,8 @@ if (isset($_SESSION['user_id'])) {
     header('Location: ' . BASE_URL . '/index.php');
     exit;
 }
+$scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+$fullBase = $scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . BASE_URL;
 ?>
 <!DOCTYPE html>
 <html lang="en" data-theme="light">
@@ -22,13 +24,13 @@ if (isset($_SESSION['user_id'])) {
 <meta property="og:title" content="Habit Tracker Pro - Build Better Habits">
 <meta property="og:description" content="Track daily habits, build powerful streaks, and transform your life. Free, beautiful habit tracker.">
 <meta property="og:type" content="website">
-<meta property="og:url" content="http://vps-gob2parp.jugaar.ai:9001/habit-tracker/">
-<meta property="og:image" content="http://vps-gob2parp.jugaar.ai:9001/habit-tracker/icon-192.png">
+<meta property="og:url" content="<?php echo htmlspecialchars($fullBase . '/'); ?>">
+<meta property="og:image" content="<?php echo htmlspecialchars($fullBase . '/public/icon.svg'); ?>">
 <!-- Twitter Card -->
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Habit Tracker Pro">
 <meta name="twitter:description" content="Track daily habits, build streaks, and transform your life.">
-<link rel="canonical" href="http://vps-gob2parp.jugaar.ai:9001/habit-tracker/">
+<link rel="canonical" href="<?php echo htmlspecialchars($fullBase . '/'); ?>">
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
 :root{--bg-primary:#f5f3ff;--bg-secondary:#ffffff;--text-primary:#1e1b4b;--text-secondary:#4c4983;--text-muted:#8b87b0;--accent:#6366f1;--accent-light:#818cf8;--accent-dark:#4f46e5;--success:#10b981;--danger:#ef4444;--border:rgba(99,102,241,0.1);--shadow:0 8px 32px rgba(99,102,241,0.08);--radius:20px;--radius-sm:12px;--radius-xs:8px;--transition:all 0.3s cubic-bezier(0.4,0,0.2,1);--gradient-1:linear-gradient(135deg,#6366f1 0%,#8b5cf6 100%);--gradient-2:linear-gradient(135deg,#06b6d4 0%,#3b82f6 100%);--gradient-3:linear-gradient(135deg,#f59e0b 0%,#ef4444 100%)}
@@ -37,6 +39,9 @@ if (isset($_SESSION['user_id'])) {
 body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg-primary);color:var(--text-primary);line-height:1.6;overflow-x:hidden}
 body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%;background:radial-gradient(circle at 30% 50%,rgba(99,102,241,0.06) 0%,transparent 50%),radial-gradient(circle at 70% 80%,rgba(139,92,246,0.05) 0%,transparent 50%);z-index:-1;animation:bgFloat 20s ease-in-out infinite}
 @keyframes bgFloat{0%,100%{transform:translate(0,0)}50%{transform:translate(-2%,-2%)}}
+body::before{animation:none!important}
+.shape{animation:none!important}
+.navbar{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
 a{color:var(--accent);text-decoration:none;font-weight:600}
 a:hover{text-decoration:underline}
 img{max-width:100%}

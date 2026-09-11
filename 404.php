@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/config.php';
 http_response_code(404);
 ?>
 <!DOCTYPE html>
@@ -26,7 +27,7 @@ p{color:var(--muted);font-size:15px;margin-bottom:28px}
     <div class="code">404</div>
     <h1>Page Not Found</h1>
     <p>The page you're looking for doesn't exist or has been moved.</p>
-    <a href="/habit-tracker/" class="btn">← Back to Home</a>
+    <a href="<?php echo htmlspecialchars(BASE_URL . '/'); ?>" class="btn">← Back to Home</a>
 </div>
 </body>
 </html>

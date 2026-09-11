@@ -1,4 +1,20 @@
 <?php
+// Session persistence + hardening (must run before session_start)
+$sessionLifetime = 30 * 24 * 60 * 60; // 30 days: keep user logged in across browser restarts
+$scriptName = $_SERVER['SCRIPT_NAME'] ?? '/';
+$basePath = rtrim(str_replace('\\', '/', dirname($scriptName)), '/');
+$cookiePath = ($basePath === '') ? '/' : $basePath . '/';
+ini_set('session.gc_maxlifetime', (string)$sessionLifetime);
+ini_set('session.cookie_lifetime', (string)$sessionLifetime);
+ini_set('session.cookie_httponly', '1');
+ini_set('session.cookie_samesite', 'Lax');
+session_set_cookie_params([
+    'lifetime' => $sessionLifetime,
+    'path' => $cookiePath,
+    'httponly' => true,
+    'samesite' => 'Lax',
+    'secure' => (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off'),
+]);
 session_start();
 
 // Security session hardening
@@ -13,7 +29,7 @@ if (empty($_SESSION['fingerprint'])) {
 }
 
 define('DB_PATH', __DIR__ . '/data/habit_tracker.db');
-define('BASE_URL', rtrim(dirname($_SERVER['SCRIPT_NAME']), '/'));
+define('BASE_URL', rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/'));
 define('RATE_LIMIT_FILE', __DIR__ . '/data/rate_limits.json');
 define('RATE_LIMIT_MAX', 10); // max attempts
 define('RATE_LIMIT_WINDOW', 900); // 15 minutes
@@ -55,9 +71,10 @@ function verifyCsrf() {
 
 // Rate limiting
 function checkRateLimit($key) {
-    $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+    $ip = getClientIp();
     $rateFile = RATE_LIMIT_FILE;
     $limits = file_exists($rateFile) ? json_decode(file_get_contents($rateFile), true) : [];
+    if (!is_array($limits)) $limits = [];
     $now = time();
     $rk = $key . ':' . $ip;
 
@@ -74,6 +91,16 @@ function checkRateLimit($key) {
     }
 
     $limits[$rk][] = $now;
+
+    // Keep the rate-limit file bounded: prune stale buckets when it grows large
+    if (count($limits) > 500) {
+        foreach ($limits as $r => &$arr) {
+            $arr = is_array($arr) ? array_values(array_filter($arr, fn($t) => $t > $now - RATE_LIMIT_WINDOW)) : [];
+            if (empty($arr)) unset($limits[$r]);
+        }
+        unset($arr);
+    }
+
     file_put_contents($rateFile, json_encode($limits), LOCK_EX);
 }
 
