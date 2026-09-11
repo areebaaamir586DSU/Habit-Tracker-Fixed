@@ -26,15 +26,13 @@ $respCSS = '
 body{padding-top:40px!important;overflow-x:hidden}
 
 /* PERFORMANCE: kill GPU/compositor killers that freeze weak machines
-   (fullpage infinite gradient anim + backdrop blur on every card + all transitions) */
+   (fullpage infinite gradient anim + backdrop blur on every card) */
 body::before,body::after{display:none!important;animation:none!important}
 *{backdrop-filter:none!important}
-*{transition:none!important}
 .btn-glow{animation:none!important}
 .quote-card::before,.xp-progress-fill::after{animation:none!important}
 .streak-fire{animation:none!important}
-.tab-content{animation:none!important}
-:root{--blur:blur(0px);--transition:opacity .12s linear}
+:root{--blur:blur(0px)}
 
 /* PREVENT FIXED-WIDTH OVERFLOW BELOW 1440 (tabs/stats force .app-container min-content to 1440) */
 .app-container{min-width:0}
